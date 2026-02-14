@@ -7,11 +7,22 @@ export default function CodingResult() {
   const router = useRouter();
   const { results, problems, resetAttempt, clearTest } = useCodingStore();
 
-  const allResults = Object.values(results).flat();
-  const passed = allResults.filter((r) => r.passed).length;
-  const total = allResults.length;
+  // Total number of problems
+  const totalProblems = problems.length;
 
-  const percentage = total > 0 ? Math.round((passed / total) * 100) : 0;
+  // Count fully solved problems
+  const solvedProblems = problems.filter((problem, index) => {
+    const problemResults = results[index];
+
+    if (!problemResults) return false; // Not attempted
+
+    return problemResults.every((r) => r.passed);
+  }).length;
+
+  const percentage =
+    totalProblems > 0
+      ? Math.round((solvedProblems / totalProblems) * 100)
+      : 0;
 
   const getStatusColor = () => {
     if (percentage === 100) return "text-green-600";
@@ -34,41 +45,56 @@ export default function CodingResult() {
           </div>
 
           <p className="text-gray-600 mt-2">
-            Passed {passed} out of {total} Test Cases
+            Solved {solvedProblems} out of {totalProblems} Problems
           </p>
         </div>
 
         {/* Detailed Breakdown */}
         <div className="mb-8">
           <h3 className="text-lg font-medium mb-4">
-            Test Case Breakdown
+            Problem Breakdown
           </h3>
 
           <div className="space-y-3">
-            {problems.map((problem, pIndex) => (
-              <div key={pIndex} className="mb-6">
-                <h4 className="font-semibold mb-3">
-                  {problem.title}
-                </h4>
+            {problems.map((problem, pIndex) => {
+              const problemResults = results[pIndex];
 
-                <div className="space-y-2">
-                  {(results[pIndex] || []).map((r, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-lg border flex justify-between ${
-                        r.passed
-                          ? "bg-green-50 border-green-200 text-green-700"
-                          : "bg-red-50 border-red-200 text-red-600"
-                      }`}
-                    >
-                      <span>Test Case {i + 1}</span>
-                      <span>{r.passed ? "Passed" : "Failed"}</span>
-                    </div>
-                  ))}
+              const isSolved =
+                problemResults &&
+                problemResults.every((r) => r.passed);
+
+              return (
+                <div key={pIndex} className="mb-6">
+                  <h4 className="font-semibold mb-3">
+                    {problem.title}
+                  </h4>
+
+                  <div
+                    className={`p-3 rounded-lg border flex justify-between ${
+                      !problemResults
+                        ? "bg-gray-50 border-gray-200 text-gray-500"
+                        : isSolved
+                        ? "bg-green-50 border-green-200 text-green-700"
+                        : "bg-red-50 border-red-200 text-red-600"
+                    }`}
+                  >
+                    <span>
+                      {!problemResults
+                        ? "Not Attempted"
+                        : isSolved
+                        ? "Solved"
+                        : "Not Solved"}
+                    </span>
+
+                    <span>
+                      {!problemResults
+                        ? "-"
+                        : `${problemResults.filter(r => r.passed).length} / ${problemResults.length} Passed`}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-
+              );
+            })}
           </div>
         </div>
 
