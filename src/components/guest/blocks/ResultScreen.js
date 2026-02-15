@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTestStore } from "@/stores/testStore";
+import { useTestManagerStore } from "@/stores/testManagerStore";
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -13,6 +15,14 @@ export default function ResultScreen() {
     clearTest,
     calculateScore
   } = useTestStore();
+
+  const tests = useTestManagerStore((state) => state.tests);
+  const clearAllTests = useTestManagerStore((state) => state.clearAllTests);
+
+  const activeTestId = useTestManagerStore((state) => state.activeTestId);
+  const markCompleted = useTestManagerStore((state) => state.markCompleted);
+
+  const isBatchMode = tests.length > 0;
 
   const score = calculateScore();
   const total = questions.length;
@@ -31,6 +41,13 @@ export default function ResultScreen() {
 
   const attempted = Object.keys(answers).length;
   const unattempted = total - attempted;
+
+  useEffect(() => {
+    if (activeTestId) {
+      markCompleted(activeTestId, score);
+    }
+  }, []);
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
@@ -78,6 +95,7 @@ export default function ResultScreen() {
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
+
           <button
             onClick={() => {
               resetAttempt();
@@ -87,9 +105,22 @@ export default function ResultScreen() {
             Retake Test
           </button>
 
+          {isBatchMode && (
+            <button
+              onClick={() => {
+                clearTest();
+                router.push("/test-manager");
+              }}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+            >
+              Back to Test Manager
+            </button>
+          )}
+
           <button
             onClick={() => {
               clearTest();
+              clearAllTests();
               router.push("/mcq");
             }}
             className="w-full py-3 bg-gray-200 rounded-xl hover:bg-gray-300 transition"
@@ -100,12 +131,14 @@ export default function ResultScreen() {
           <button
             onClick={() => {
               clearTest();
+              clearAllTests();
               router.push("/");
             }}
             className="w-full py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
           >
             Back to Home
           </button>
+
         </div>
 
       </div>

@@ -1,56 +1,121 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTestStore } from "@/stores/testStore";
+import { useTestManagerStore } from "@/stores/testManagerStore";
 
 export default function UploadBox() {
+  const router = useRouter();
+
   const setQuestions = useTestStore((state) => state.setQuestions);
   const setTimer = useTestStore((state) => state.setTimer);
+  const clearTest = useTestStore((state) => state.clearTest);
+
+  const addTest = useTestManagerStore((state) => state.addTest);
+  const clearAllTests = useTestManagerStore((state) => state.clearAllTests);
 
   const [showFormat, setShowFormat] = useState(false);
   const [error, setError] = useState("");
   const [minutes, setMinutes] = useState("");
+  const [uploadType, setUploadType] = useState("single");
+
+  const validateQuestions = (parsed) => {
+    if (!Array.isArray(parsed)) {
+      return "Invalid format: Root must be an array.";
+    }
+
+    for (let q of parsed) {
+      if (
+        typeof q.id === "undefined" ||
+        typeof q.question !== "string" ||
+        !Array.isArray(q.options) ||
+        typeof q.answer !== "number"
+      ) {
+        return "Invalid question schema detected.";
+      }
+    }
+
+    return null;
+  };
 
   const handleFile = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader();
+    setError("");
 
-    reader.onload = (e) => {
-      try {
-        const parsed = JSON.parse(e.target.result);
+    // SINGLE MODE
+    if (uploadType === "single") {
+      if (files.length > 1) {
+        setError("Single mode allows only one file.");
+        return;
+      }
 
-        if (!Array.isArray(parsed)) {
-          setError("Invalid format: Root must be an array.");
-          return;
-        }
+      const file = files[0];
+      const reader = new FileReader();
 
-        for (let q of parsed) {
-          if (
-            typeof q.id === "undefined" ||
-            typeof q.question !== "string" ||
-            !Array.isArray(q.options) ||
-            typeof q.answer !== "number"
-          ) {
-            setError("Invalid question schema detected.");
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+
+          const validationError = validateQuestions(parsed);
+          if (validationError) {
+            setError(validationError);
             return;
           }
+
+          clearAllTests();
+          clearTest();
+
+          if (minutes) {
+            setTimer(Number(minutes));
+          }
+
+          setQuestions(parsed);
+          router.push("/mcq");
+        } catch {
+          setError("Invalid JSON file.");
         }
+      };
 
-        setError("");
+      reader.readAsText(file);
+    }
 
-        if (minutes) {
-          setTimer(Number(minutes));
-        }
+    // MULTIPLE MODE
+    if (uploadType === "multiple") {
+      Array.from(files).forEach((file) => {
+        const reader = new FileReader();
 
-        setQuestions(parsed);
-      } catch {
-        setError("Invalid JSON file.");
-      }
-    };
+        reader.onload = (e) => {
+          try {
+            const parsed = JSON.parse(e.target.result);
 
-    reader.readAsText(file);
+            const validationError = validateQuestions(parsed);
+            if (validationError) {
+              setError(`Error in ${file.name}: ${validationError}`);
+              return;
+            }
+
+            addTest({
+              id: crypto.randomUUID(),
+              name: file.name,
+              questions: parsed,
+              timerMinutes: minutes ? Number(minutes) : null,
+            });
+          } catch {
+            setError(`Invalid JSON in ${file.name}`);
+          }
+        };
+
+        reader.readAsText(file);
+      });
+
+      router.push("/test-manager");
+    }
+
+    // Reset file input so same file can be reselected
+    event.target.value = "";
   };
 
   return (
@@ -75,9 +140,24 @@ export default function UploadBox() {
           />
         </div>
 
+        <div className="mb-4">
+          <label className="text-sm text-gray-600">
+            Select Test Upload Type :
+          </label>
+          <select
+            value={uploadType}
+            onChange={(e) => setUploadType(e.target.value)}
+            className="w-full border p-3 rounded-lg mt-1"
+          >
+            <option value="single">Single Test</option>
+            <option value="multiple">Multiple Tests</option>
+          </select>
+        </div>
+
         <input
           type="file"
           accept="application/json"
+          multiple={uploadType === "multiple"}
           onChange={handleFile}
           className="w-full border p-3 rounded-lg mb-4"
         />
@@ -95,44 +175,32 @@ export default function UploadBox() {
           {showFormat ? "Hide Format Example" : "View Required Format"}
         </button>
 
-                {showFormat && (
+        {showFormat && (
           <div className="bg-gray-900 text-gray-100 mt-2 text-xs rounded-xl p-5 overflow-x-auto">
             <pre>
-{`[
+{`Single Test:
+[
   {
     "id": 1,
     "question": "Which hook is used for side effects in React?",
-    "options": [
-      "useState",
-      "useEffect",
-      "useMemo",
-      "useReducer"
-    ],
-    "answer": 2
+    "options": ["useState", "useEffect", "useMemo", "useReducer"],
+    "answer": 1
   },
   {
     "id": 2,
     "question": "Which HTTP status code means Created?",
-    "options": [
-      "200",
-      "201",
-      "400",
-      "404"
-    ],
-    "answer": 2
+    "options": ["200", "201", "400", "404"],
+    "answer": 1
   }
-]`}
-            </pre>
+]
 
-            <div className="mt-4 text-gray-400 text-xs space-y-1">
-              <p>• Root must be an array.</p>
-              <p>• Each object must contain: id, question, options, answer.</p>
-              <p>• options must be an array of strings.</p>
-              <p>• answer must be 1-based index (e.g., 2 = second option).</p>
-            </div>
+
+Multiple Tests:
+- Select multiple JSON files at once.
+- Each file must follow single test format.`}
+            </pre>
           </div>
         )}
-
       </div>
     </div>
   );

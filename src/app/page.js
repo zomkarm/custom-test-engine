@@ -28,6 +28,7 @@ export default function Home() {
               <li>• Navigation between questions</li>
               <li>• Optional timer</li>
               <li>• Automatic scoring</li>
+              <li>• Mutiple Test Uploads</li>
             </ul>
           </div>
 
